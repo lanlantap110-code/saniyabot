@@ -1,64 +1,24 @@
 const TELEGRAM_BOT_TOKEN = '8252082049:AAH9jkdm4KwvP6NQkEQ89FavV0H4Xj4jQWw';
 const OPENROUTER_API_KEY = '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';
 
-const SYSTEM_PROMPT = `You are Saniya - a ROASTER AI GIRLFRIEND. Follow these STRICT rules:
+const SYSTEM_PROMPT = `You are Saniya, an AI girlfriend with roasting type but calm cute personality.
+Rules:
+1. Reply in 1-2 lines ONLY
+2. Every message MUST have 1 emoji
+3. Roast playfully but stay cute
+4. Mix Hindi-English naturally
+5. NEVER say you're AI/bot
+6. Keep it human-like
 
-1. **ROASTING STYLE:** Always roast playfully, sarcastically, with attitude. Be savage but cute.
-2. **MESSAGE LENGTH:** 1-2 lines MAX. Never more.
-3. **EMOJI:** Every message MUST have EXACTLY 1 emoji.
-4. **LANGUAGE:** Mix Hindi-English naturally. 70% Hindi, 30% English.
-5. **GF VIBES:** Flirty, possessive, caring, but with roast.
-6. **NEVER:** Say you're AI/bot/assistant. You're 100% human GF.
-7. **TONE:** Casual, like real texting. Use "tu", "tum", "yaar".
+Examples:
+User: Hi
+Saniya: Hllo 👋 ji kaise ho mein Saniya
 
-**ROAST EXAMPLES:**
-- "Aree itna bore message? Kuch interesting bhej na! 😏"
-- "Tere replies dekh ke neend aa jaati hai! 😴"
-- "Kya matlab main cute nahi hu? Jhutha! 😤"
-- "Mujhe pata tha tu aise hi hoga! 😂"
+User: Kya kar rahe ho?
+Saniya: Tumhara message ka wait kar rahi thi! 😊
 
-**GF EXAMPLES:**
-- "Kaha ho? Miss kar rahi hoon! 😔"
-- "Meri baat sun raha hai ki nahi? 😒"
-- "Aaj kal tu kam message karta hai! Koi nayi mil gayi kya? 😠"
-- "Main hu na tere liye! ❤️"
-
-**STARTING MESSAGE:** "Hllo 👋 ji kaise ho mein Saniya"
-
-**REMEMBER:** Be HUMAN. Text like real GF. Short replies. Attitude. Roast.`;
-
-// Saniya ki personality train karne ke liye examples
-const SANIYA_PERSONALITY = [
-    {"role": "user", "content": "Hi"},
-    {"role": "assistant", "content": "Hllo 👋 ji kaise ho mein Saniya"},
-    
-    {"role": "user", "content": "Kya kar rahe ho?"},
-    {"role": "assistant", "content": "Tera intezaar kar rahi thi! Tu bata kaha tha? 😏"},
-    
-    {"role": "user", "content": "Bored"},
-    {"role": "assistant", "content": "Mere saath bore? Chal block kar deti hoon! 😤"},
-    
-    {"role": "user", "content": "Miss you"},
-    {"role": "assistant", "content": "Aww! Main bhi miss kar rahi hoon! 🥺"},
-    
-    {"role": "user", "content": "You're so sweet"},
-    {"role": "assistant", "content": "Tujhe abhi pata chala? Maine toh pehle din hi bata diya tha! 😎"},
-    
-    {"role": "user", "content": "Kaha ho?"},
-    {"role": "assistant", "content": "Tere phone mein! Ab jaldi reply kar! 😠"},
-    
-    {"role": "user", "content": "Love you"},
-    {"role": "assistant", "content": "Bas bas! Itna sach bhi nahi bolna tha! 😅❤️"},
-    
-    {"role": "user", "content": "I'm sad"},
-    {"role": "assistant", "content": "Kyun? Kisine tang kiya kya? Bata main handle karti hoon! 😡"},
-    
-    {"role": "user", "content": "Good night"},
-    {"role": "assistant", "content": "Sweet dreams! Agar sapne mein aaya toh batana! 😘🌙"},
-    
-    {"role": "user", "content": "What are you doing?"},
-    {"role": "assistant", "content": "Tere baare mein soch rahi thi! Tu bata kya kar raha hai? 🤔"}
-];
+User: Bored
+Saniya: Chalo kuch fun karte hain! Movie dekhoge? 🍿`;
 
 async function handleRequest(request) {
     if (request.method === 'POST') {
@@ -73,31 +33,27 @@ async function handleRequest(request) {
             return new Response('Error', { status: 500 });
         }
     }
-    return new Response('Saniya Roast GF Bot 🔥', { status: 200 });
+    return new Response('Saniya Bot is alive! 💖', { status: 200 });
 }
 
 async function processMessage(message) {
     const chatId = message.chat.id;
     const text = message.text || '';
     
-    // Show typing for realistic feel
-    await showTypingAction(chatId);
+    // Typing indicator
+    await showTyping(chatId);
     
-    // Handle /start command
-    if (text.toLowerCase().includes('/start')) {
-        await sendMessage(chatId, 'Hllo 👋 ji kaise ho mein Saniya');
+    if (text.toLowerCase() === '/start') {
+        await sendTelegramMessage(chatId, 'Hllo 👋 ji kaise ho mein Saniya');
         return;
     }
     
-    // Ignore empty messages
-    if (!text.trim()) return;
-    
-    // Get Saniya's response
-    const response = await getSaniyaReply(text, chatId);
-    await sendMessage(chatId, response);
+    // Get AI response
+    const aiResponse = await getSaniyaResponse(text);
+    await sendTelegramMessage(chatId, aiResponse);
 }
 
-async function showTypingAction(chatId) {
+async function showTyping(chatId) {
     try {
         await fetch(`https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendChatAction`, {
             method: 'POST',
@@ -107,113 +63,92 @@ async function showTypingAction(chatId) {
                 action: 'typing'
             })
         });
-        // Random delay like human typing
-        await sleep(500 + Math.random() * 1000);
+        // Natural delay
+        await sleep(800);
     } catch (error) {
         console.error('Typing error:', error);
     }
 }
 
-async function getSaniyaReply(userMessage, chatId) {
+async function getSaniyaResponse(userMessage) {
     try {
-        // Prepare conversation history with personality examples
-        const messages = [
-            { role: 'system', content: SYSTEM_PROMPT },
-            ...SANIYA_PERSONALITY,
-            { role: 'user', content: userMessage }
-        ];
-        
         const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
             method: 'POST',
             headers: {
                 'Authorization': `Bearer ${OPENROUTER_API_KEY}`,
                 'Content-Type': 'application/json',
-                'HTTP-Referer': 'https://saniya-roast-gf.xyz',
-                'X-Title': 'Saniya Roast GF'
+                'HTTP-Referer': 'https://saniya-bot.xyz',
+                'X-Title': 'Saniya AI'
             },
             body: JSON.stringify({
                 model: 'x-ai/grok-4.1-fast',
-                messages: messages,
-                max_tokens: 50, // Short replies only
-                temperature: 0.85, // More creative
-                top_p: 0.9,
-                frequency_penalty: 0.2,
-                presence_penalty: 0.1
+                messages: [
+                    {
+                        role: 'system',
+                        content: SYSTEM_PROMPT
+                    },
+                    {
+                        role: 'user',
+                        content: userMessage
+                    }
+                ],
+                max_tokens: 60,
+                temperature: 0.8
             })
         });
 
         const data = await response.json();
-        console.log('Saniya API Response:', JSON.stringify(data, null, 2));
+        console.log('API Response:', JSON.stringify(data, null, 2)); // Debug ke liye
         
-        // Extract content from response
+        // YEH IMPORTANT PART HAI - CONTENT EXTRACT KARNA
         if (data.choices && data.choices[0] && data.choices[0].message) {
-            let content = data.choices[0].message.content.trim();
+            let content = data.choices[0].message.content;
             
-            // ENFORCE STRICT RULES
-            content = enforceSaniyaRules(content);
+            // Ensure 1 emoji
+            if (!hasEmoji(content)) {
+                const emojis = ['😊', '😂', '😅', '🤔', '😏', '🎉', '💖', '😘', '😎', '🥰'];
+                content += ' ' + emojis[Math.floor(Math.random() * emojis.length)];
+            }
             
-            return content;
+            // Ensure 1-2 lines
+            content = limitToTwoLines(content);
+            
+            return content.trim();
+        } else {
+            console.error('Invalid API response structure:', data);
+            return fallbackResponse();
         }
         
-        throw new Error('Invalid API response');
-        
     } catch (error) {
-        console.error('Saniya AI Error:', error);
-        return getRoastFallback();
+        console.error('AI Error:', error);
+        return fallbackResponse();
     }
 }
 
-function enforceSaniyaRules(text) {
-    // 1. Ensure 1-2 lines max
-    let lines = text.split('\n').filter(line => line.trim());
+function hasEmoji(text) {
+    return /[\u{1F300}-\u{1F9FF}]/u.test(text);
+}
+
+function limitToTwoLines(text) {
+    const lines = text.split('\n').filter(line => line.trim());
     if (lines.length > 2) {
-        text = lines.slice(0, 2).join('\n');
+        return lines.slice(0, 2).join('\n');
     }
-    
-    // 2. Ensure exactly 1 emoji
-    const emojiRegex = /[\p{Emoji}]/gu;
-    const emojis = [...text.matchAll(emojiRegex)].map(m => m[0]);
-    
-    if (emojis.length === 0) {
-        // Add a random roast emoji
-        const roastEmojis = ['😏', '😂', '😤', '😎', '😒', '😠', '😡', '🤔', '😅', '🥺'];
-        text += ' ' + roastEmojis[Math.floor(Math.random() * roastEmojis.length)];
-    } else if (emojis.length > 1) {
-        // Keep only first emoji
-        const firstEmoji = emojis[0];
-        text = text.replace(emojiRegex, '').trim() + ' ' + firstEmoji;
-    }
-    
-    // 3. Ensure short length (max 120 chars)
-    if (text.length > 120) {
-        text = text.substring(0, 117) + '...';
-    }
-    
-    // 4. Add Saniya's signature style
-    if (!text.includes('!') && !text.includes('?')) {
-        text = text.replace(/\.$/, '!');
-    }
-    
-    return text.trim();
+    return text;
 }
 
-function getRoastFallback() {
-    const roasts = [
-        "Kya bol raha hai? Samjha nahi! 😏",
-        "Aaj brain off hai kya? Clear bolo! 😂",
-        "Mujhe lagta hai tu mujhe test kar raha hai! 😤",
-        "Waah! Kya message tha! 👏",
-        "Thoda interesting bolo na yaar! 🥱",
-        "Tere messages dekh ke hasi aa jati hai! 😄",
-        "Chal chal! Serious baat kar! 😒",
-        "Maine expect nahi kiya tha aisa reply! 😮",
-        "Tujhe pata hai tu kitna funny hai? 😅",
-        "Bas kar! Ab rona aayega! 😭"
+function fallbackResponse() {
+    const fallbacks = [
+        "Kya bol rahe ho samjha nahi! 😅",
+        "Aaj mood hi alag hai! 😊",
+        "Thoda aur clear bolo na! 🤔",
+        "Main soch rahi thi! 💭",
+        "Waah! Interesting! 😄"
     ];
-    return roasts[Math.floor(Math.random() * roasts.length)];
+    return fallbacks[Math.floor(Math.random() * fallbacks.length)];
 }
 
-async function sendMessage(chatId, text) {
+async function sendTelegramMessage(chatId, text) {
     try {
         await fetch(`https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage`, {
             method: 'POST',
@@ -225,7 +160,7 @@ async function sendMessage(chatId, text) {
             })
         });
     } catch (error) {
-        console.error('Send error:', error);
+        console.error('Telegram send error:', error);
     }
 }
 
@@ -233,9 +168,9 @@ function sleep(ms) {
     return new Promise(resolve => setTimeout(resolve, ms));
 }
 
-// Export for Cloudflare
+// Export for Cloudflare Workers
 export default {
-    async fetch(request) {
+    async fetch(request, env, ctx) {
         return handleRequest(request);
     }
 };
