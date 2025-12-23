@@ -1,7 +1,7 @@
 // bot.js - Saniya Telegram Bot with Custom Endpoint
 // No API key required - using your provided endpoint
 
-const TELEGRAM_BOT_TOKEN = '8252082049:AAH9jkdm4KwvP6NQkEQ89FavV0H4Xj4jQWw';
+const TELEGRAM_BOT_TOKEN = '7905663136:AAEh-tZWIHDYAgjz57Yto_qoJAxlUrm1YiE';
 const CUSTOM_API_URL = 'https://ainikolanajsbbsjoja.vercel.app/query';
 
 // Saniya's Personality Definition
