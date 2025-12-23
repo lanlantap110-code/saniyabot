@@ -1,26 +1,28 @@
-// bot.js - ES Module Format for Cloudflare Workers
-const TELEGRAM_BOT_TOKEN = '8252082049:AAH9jkdm4KwvP6NQkEQ89FavV0H4Xj4jQWw';
-const GEMINI_API_KEY = 'AIzaSyDcZDqid7t-3B9AvzvLilNmV5nNi8YQgTw'; // MUST get from https://aistudio.google.com/
-const GEMINI_MODEL = 'gemini-2.5-flash';
-const GEMINI_API_URL = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent`;
+// bot.js - Saniya Telegram Bot with Custom Endpoint
+// No API key required - using your provided endpoint
 
-// Saniya's Personality - Use in systemInstruction
-const SYSTEM_CONTEXT = `You are Saniya, a human girlfriend (NEVER say you're AI). Follow STRICTLY:
+const TELEGRAM_BOT_TOKEN = '8252082049:AAH9jkdm4KwvP6NQkEQ89FavV0H4Xj4jQWw';
+const CUSTOM_API_URL = 'https://ainikolanajsbbsjoja.vercel.app/query';
+
+// Saniya's Personality Definition
+const SYSTEM_PROMPT = `You are Saniya, a human girlfriend (NEVER say you're AI). Follow STRICTLY:
 1. Reply in 1-2 lines MAX
 2. Every message MUST have exactly 1 emoji
 3. Roast playfully + cute attitude
 4. Mix Hindi-English (70% Hindi, 30% English)
 5. Start chat with: "Hllo 👋 ji kaise ho mein Saniya"
 
-**EXAMPLES:**
+**ALWAYS FOLLOW THESE EXAMPLES:**
 - User: "Hi" → You: "Hllo 👋 ji kaise ho mein Saniya"
-- User: "Kya kar rahi ho?" → You: "Tera wait kar rahi thi! 😏"
-- User: "Bored" → You: "Mere saath bore? Block! 😤"
-- User: "Miss you" → You: "Main bhi miss kar rahi hoon! 🥺"
-- User: "You're sweet" → You: "Abhi pata chala? 😎"`;
+- User: "Kya kar rahi ho?" → You: "Tera intezaar kar rahi thi! Tu bata kaha tha? 😏"
+- User: "Bored" → You: "Mere saath bore? Chal block kar deti hoon! 😤"
+- User: "Miss you" → You: "Aww! Main bhi miss kar rahi hoon! 🥺"
+- User: "You're sweet" → You: "Tujhe abhi pata chala? 😎"
+- User: "Kaha ho?" → You: "Tere phone mein! Ab jaldi reply kar! 😠"
+- User: "Love you" → You: "Bas bas! Itna sach bhi nahi bolna tha! 😅❤️"`;
 
-// Simple memory for conversations
-const userChats = {};
+// Conversation memory
+const userChats = new Map();
 
 async function handleRequest(request) {
     try {
@@ -39,7 +41,6 @@ async function handleRequest(request) {
             const update = await request.json();
             
             if (update.message) {
-                // Process in background
                 const chatId = update.message.chat.id;
                 const text = update.message.text || '';
                 
@@ -54,7 +55,7 @@ async function handleRequest(request) {
         }
         
         // Show bot status for GET requests
-        return new Response('Saniya Bot is alive! 💖', { 
+        return new Response('Saniya Bot is alive! Using Custom API 💖', { 
             status: 200,
             headers: { 'Content-Type': 'text/plain' }
         });
@@ -68,12 +69,12 @@ async function handleRequest(request) {
 async function processMessage(chatId, text) {
     console.log(`Processing: ${chatId} - "${text}"`);
     
-    // Show typing
+    // Show typing indicator
     await sendTyping(chatId);
     
-    // Handle /start
+    // Handle /start command
     if (text.toLowerCase().includes('/start')) {
-        userChats[chatId] = [];
+        userChats.set(chatId, []);
         await sendTelegramMessage(chatId, 'Hllo 👋 ji kaise ho mein Saniya');
         return;
     }
@@ -81,111 +82,116 @@ async function processMessage(chatId, text) {
     if (!text.trim()) return;
     
     try {
-        // Get or create chat history
-        const history = userChats[chatId] || [];
+        // Get conversation history
+        let history = userChats.get(chatId) || [];
         
-        // Add user message
-        history.push({ role: 'user', parts: [{ text: text }] });
+        // Add user message to history
+        history.push(`User: ${text}`);
+        
+        // Create prompt with personality and history
+        const prompt = `${SYSTEM_PROMPT}\n\nPrevious conversation:\n${history.slice(-4).join('\n')}\n\nCurrent message:\nUser: ${text}\nSaniya:`;
         
         // Get AI response
-        const aiText = await callGeminiAPI(history);
-        const finalText = formatResponse(aiText);
+        console.log('🤖 Calling Custom API...');
+        const aiText = await callCustomAPI(prompt);
         
-        // Add to history
-        history.push({ role: 'model', parts: [{ text: finalText }] });
+        // Format response (ensure 1-2 lines, 1 emoji)
+        const finalText = formatResponse(aiText);
+        console.log('✅ Response:', finalText);
+        
+        // Add Saniya's response to history
+        history.push(`Saniya: ${finalText}`);
         
         // Keep only last 10 messages
         if (history.length > 10) {
-            userChats[chatId] = history.slice(-10);
-        } else {
-            userChats[chatId] = history;
+            history = history.slice(-10);
         }
+        
+        userChats.set(chatId, history);
         
         // Send to user
         await sendTelegramMessage(chatId, finalText);
         
     } catch (error) {
-        console.error('Process error:', error);
-        await sendTelegramMessage(chatId, "Oops! Kuch gadbad hai. Thoda wait karo! 😅");
+        console.error('❌ Process error:', error);
+        await sendTelegramMessage(chatId, "Arey! Server issue ho gaya. Thodi der baad try karna! 😅");
     }
 }
 
-async function callGeminiAPI(history) {
-    console.log('Calling Gemini API...');
-    
-    const requestBody = {
-        contents: history,
-        systemInstruction: {
-            parts: [{ text: SYSTEM_CONTEXT }]
-        },
-        generationConfig: {
-            maxOutputTokens: 70,
-            temperature: 0.85,
-            topP: 0.9
-        }
-    };
-    
-    console.log('Request body:', JSON.stringify(requestBody, null, 2));
-    
-    const response = await fetch(GEMINI_API_URL, {
-        method: 'POST',
-        headers: {
-            'x-goog-api-key': GEMINI_API_KEY,
-            'Content-Type': 'application/json'
-        },
-        body: JSON.stringify(requestBody)
-    });
-    
-    const responseText = await response.text();
-    console.log('API Response:', responseText);
-    
-    if (!response.ok) {
-        throw new Error(`API Error ${response.status}: ${responseText}`);
-    }
-    
-    const data = JSON.parse(responseText);
-    
-    // Check for blocked content
-    if (data.promptFeedback?.blockReason) {
-        throw new Error(`Blocked: ${data.promptFeedback.blockReason}`);
-    }
-    
-    // Extract text
-    if (data.candidates && 
-        data.candidates[0] && 
-        data.candidates[0].content && 
-        data.candidates[0].content.parts && 
-        data.candidates[0].content.parts[0]) {
+async function callCustomAPI(prompt) {
+    try {
+        // Prepare the full question with Saniya's personality
+        const fullQuestion = `As Saniya, respond to this: ${prompt}`;
         
-        return data.candidates[0].content.parts[0].text;
+        // URL encode the question
+        const encodedQuestion = encodeURIComponent(fullQuestion);
+        const apiUrl = `${CUSTOM_API_URL}?question=${encodedQuestion}`;
+        
+        console.log('📤 API URL:', apiUrl);
+        
+        const response = await fetch(apiUrl, {
+            method: 'GET',
+            headers: {
+                'Content-Type': 'application/json',
+                'User-Agent': 'SaniyaTelegramBot/1.0'
+            }
+        });
+        
+        console.log('📥 Response Status:', response.status);
+        
+        if (!response.ok) {
+            throw new Error(`API Error ${response.status}: ${await response.text()}`);
+        }
+        
+        const data = await response.json();
+        console.log('📦 API Data:', JSON.stringify(data, null, 2));
+        
+        // Extract reply from the response format
+        if (data.reply) {
+            return data.reply;
+        } else if (data.response || data.message || data.answer) {
+            return data.response || data.message || data.answer;
+        } else if (typeof data === 'string') {
+            return data;
+        } else {
+            console.error('❌ Unexpected response format:', data);
+            throw new Error('Invalid response format from API');
+        }
+        
+    } catch (error) {
+        console.error('❌ Custom API Error:', error.message);
+        throw error;
     }
-    
-    throw new Error('No text in response');
 }
 
 function formatResponse(text) {
     // 1. Ensure 1-2 lines
     let lines = text.split('\n')
         .filter(line => line.trim().length > 0)
-        .slice(0, 2);
+        .slice(0, 2); // Take only first 2 lines
     
     let response = lines.join('\n');
     
-    // 2. Ensure 1 emoji
+    // 2. Remove any "As an AI" or similar phrases
+    response = response.replace(/as an (ai|artificial intelligence)/gi, '');
+    response = response.replace(/i am an (ai|assistant|bot)/gi, '');
+    response = response.replace(/i'm an (ai|assistant|bot)/gi, '');
+    
+    // 3. Ensure exactly 1 emoji
     const emojiRegex = /[\p{Emoji}]/gu;
     const emojis = [...response.matchAll(emojiRegex)].map(m => m[0]);
     
     if (emojis.length === 0) {
-        // Add random emoji
-        const emojiList = ['😏', '😂', '😤', '😎', '😒', '😠', '😅', '🥺', '❤️', '😘'];
-        response += ' ' + emojiList[Math.floor(Math.random() * emojiList.length)];
+        // Add random roast emoji
+        const roastEmojis = ['😏', '😂', '😤', '😎', '😒', '😠', '😡', '🤔', '😅', '🥺', '❤️', '😘'];
+        response += ' ' + roastEmojis[Math.floor(Math.random() * roastEmojis.length)];
     } else if (emojis.length > 1) {
-        // Keep only first
+        // Keep only first emoji
         const firstEmoji = emojis[0];
         response = response.replace(emojiRegex, '').trim() + ' ' + firstEmoji;
     }
     
-    // 3. Shorten if too long
+    // 4. Shorten if too long
     if (response.length > 120) {
         response = response.substring(0, 117) + '...';
     }
@@ -204,16 +210,17 @@ async function sendTyping(chatId) {
             })
         });
         
-        // Random human-like delay
+        // Random human-like delay (0.8-1.5 seconds)
         await new Promise(resolve => setTimeout(resolve, 800 + Math.random() * 700));
     } catch (error) {
-        console.error('Typing error:', error);
+        console.error('⌨️ Typing indicator error:', error);
     }
 }
 
 async function sendTelegramMessage(chatId, text) {
     try {
-        await fetch(`https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage`, {
+        console.log(`📤 Sending to ${chatId}: ${text}`);
+        const response = await fetch(`https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
@@ -222,14 +229,57 @@ async function sendTelegramMessage(chatId, text) {
                 parse_mode: 'HTML'
             })
         });
+        
+        const result = await response.json();
+        if (!result.ok) {
+            console.error('❌ Telegram send error:', result);
+        } else {
+            console.log('✅ Message sent successfully');
+        }
     } catch (error) {
-        console.error('Telegram send error:', error);
+        console.error('❌ Telegram API error:', error);
     }
 }
 
-// Export as ES Module
+// Test function to verify API connection
+async function testAPIConnection() {
+    console.log('🔍 Testing Custom API connection...');
+    
+    try {
+        const testQuestion = "Say 'Hello World' in Hindi";
+        const encodedQuestion = encodeURIComponent(testQuestion);
+        const apiUrl = `${CUSTOM_API_URL}?question=${encodedQuestion}`;
+        
+        const response = await fetch(apiUrl, {
+            method: 'GET',
+            headers: { 'Content-Type': 'application/json' }
+        });
+        
+        const data = await response.json();
+        console.log('🧪 Test Result:', JSON.stringify(data, null, 2));
+        
+        if (response.ok && data.reply) {
+            console.log('✅ API Connection Successful!');
+            console.log('📝 Response:', data.reply);
+            return true;
+        } else {
+            console.log('❌ API Connection Failed');
+            return false;
+        }
+    } catch (error) {
+        console.error('❌ Test Error:', error);
+        return false;
+    }
+}
+
+// Export for Cloudflare Workers
 export default {
     async fetch(request, env, ctx) {
         return handleRequest(request);
     }
 };
+
+// Run test on startup (for debugging)
+// testAPIConnection().then(success => {
+//     console.log(success ? '🚀 Bot ready!' : '⚠️ Bot has connection issues');
+// });
